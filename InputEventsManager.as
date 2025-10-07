@@ -8,8 +8,6 @@ package
     public class InputEventsManager 
     {
 
-        public static const KEY_DOWN:String = "keyDown";
-        public static const KEY_UP:String = "keyUp";
         public static var dispatcher:InputEventsManager = new (InputEventsManager)();
 
         private var _eventDispatcher:EventDispatcher;
