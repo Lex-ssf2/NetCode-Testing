@@ -6,7 +6,7 @@ package {
   public class CharacterController extends Sprite {
 
     private const MAX_INPUT_BUFFER:int = 10;
-    private const INPUT_DELAY:int = 3;
+    private const INPUT_DELAY:int = 0;
 
     private var m_UP:int;
     private var m_DOWN:int;
@@ -65,15 +65,13 @@ package {
       return state;
     }
 
-    private function addToInputBuffer():void {
-      /*m_inputBuffer.unshift(getInputState(input.getBuffer()));
-      if (m_inputBuffer.length > MAX_INPUT_BUFFER) {
-        m_inputBuffer.pop();
-      }*/
+    public function addToInputBuffer(buffer:Array, currentClient:int):void {
+      if (currentClient < 0 || !buffer || !buffer[currentClient - 1] || buffer.length <= 0 || buffer[currentClient - 1].length <= 0) return;
+      m_inputBuffer.unshift(buffer[currentClient - 1][0]);
     }
 
     private function movement():void{
-      if(m_inputBuffer.length < MAX_INPUT_BUFFER) return;
+      if(m_inputBuffer.length <= INPUT_DELAY) return;
       if(m_inputBuffer[INPUT_DELAY] & 63) m_mc.gotoAndStop("walk");
       else m_mc.gotoAndStop("idle");
       if (m_inputBuffer[INPUT_DELAY] & isPressingLeft) {
@@ -94,7 +92,6 @@ package {
     }
 
     public function PERFORMALL():void {
-      addToInputBuffer();
       movement();
       return;
     }

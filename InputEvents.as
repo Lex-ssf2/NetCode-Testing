@@ -8,6 +8,7 @@ package
         public static const KEY_UP:String = "InputEvents::keyUp";
         public static const JOINED:String = "InputEvents::joined";
         public static const OTHER_USER_CONNECTED:String = "InputEvents::otherUserConnected";
+        public static const HAS_SPAWNED:String = "InputEvents::hasSpawned";
 
         public var data:Object;
 

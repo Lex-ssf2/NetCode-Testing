@@ -10,6 +10,7 @@
     private var clients:Array = [];
     private var serverSocket:ServerSocket;
     private var controllers:Array = [];
+    private var controllersBuffer:Array = [];
 
     public function HostServer() {
       super();
@@ -31,6 +32,7 @@
       e.socket.flush();
       e.socket.addEventListener(ProgressEvent.SOCKET_DATA, onClientData);
       controllers.push(new Array());
+      controllersBuffer.push(new Array());
       for each (var client:Socket in clients) {
         if (client != e.socket) {
           client.writeObject({ type: "otherUserConnected", id: clients.length });
@@ -39,6 +41,9 @@
       }
       for each (var array:Array in controllers) {
        array.length = 0;
+      }
+      for each (var buffer:Array in controllersBuffer) {
+       buffer.length = 0;
       }
     }
 
@@ -50,13 +55,26 @@
           var clientIndex:int = data.data.id - 1;
           if (clientIndex != -1) {
             controllers[clientIndex] = data.data.input;
-          }
-          var currentInputs:Object = { type: "update", controllers: controllers };
-          for each (var client:Socket in clients) {
-              client.writeObject(currentInputs);
-              client.flush();
+            controllersBuffer[clientIndex] = controllers[clientIndex].concat(data.data.input);
           }
         }
+      }
+    }
+
+    public function PERFORMALL():void {
+      if(clients.length == 0) return;
+      var allControllersHaveSameLength:Boolean = true;
+      for each(var buffer:Array in controllersBuffer) {
+        if(buffer.length != controllersBuffer[0].length) {
+          allControllersHaveSameLength = false;
+          break;
+        }
+      }
+      if(!allControllersHaveSameLength) return;
+
+      for each (var client:Socket in clients) {
+        client.writeObject({ type: "update", controllers: controllers });
+        client.flush();
       }
     }
 

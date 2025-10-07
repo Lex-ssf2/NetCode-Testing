@@ -10,8 +10,6 @@
 		private const MAX_INPUT_WAIT:int = 3;
 
 		private var input:InputController;
-		private var character:CharacterController;
-
 		private var currentInputs:TextField;
 
 		private var hostIP:TextField;
@@ -27,6 +25,8 @@
 
 		public var inputTextFieldVector:Vector.<TextField> = new Vector.<TextField>();
 
+		public var allCharacters:Vector.<CharacterController> = new Vector.<CharacterController>();
+
 		public function Main() {
 			addChild(hostIP = new TextField());
 			hostIP.width = 200;
@@ -40,6 +40,22 @@
 			addChild(createButton = new MovieClip());
 			createButtons();
 			InputEventsManager.dispatcher.addEventListener(InputEvents.JOINED, onJoined);
+			InputEventsManager.dispatcher.addEventListener(InputEvents.OTHER_USER_CONNECTED, onOtherUserConnected);
+			InputEventsManager.dispatcher.addEventListener(InputEvents.HAS_SPAWNED, onHasSpawned);
+		}
+
+		private function onHasSpawned(e:*):void {
+			trace("A character has spawned!" + currentClient.ClientID);
+			frameTimer = 0;
+			for (var i:int = 0; i < currentClient.ClientID; i++) {
+				spawnCharacter();
+			}
+		}
+
+		private function onOtherUserConnected(e:*):void {
+			trace("Another user connected!");
+			frameTimer = 0;
+			spawnCharacter();
 		}
 
 		private function createButtons():void {
@@ -94,29 +110,35 @@
 		private function onJoined(e:*):void {
 			trace("Joined the server!");
 			removeButtons();
-			spawnCharacter();
+			input = new InputController(stage);
+			addEventListener("enterFrame", onEnterFrame);
+			for (var i:int = 0; i < currentClient.ClientID; i++) {
+				spawnCharacter();
+			}
 		}
 
 		private function spawnCharacter():void {
-			input = new InputController(stage);
-			addEventListener("enterFrame", onEnterFrame);
-			character = new CharacterController(input);
+			var character:CharacterController = new CharacterController(input);
 			addChild(character);
-			currentInputs = new TextField();
-			currentInputs.width = 400;
-			currentInputs.height = 300;
-			currentInputs.border = true;
-			currentInputs.multiline = true;
-			currentInputs.wordWrap = true;
-			addChild(currentInputs);
+			allCharacters.push(character);
 		}
 
 		private function onEnterFrame(e:*):void {
+			if(isHost) hostServer.PERFORMALL();
+			if(!currentClient.allControllersHaveSameLength() || allCharacters.length < currentClient.ClientID || currentClient.ClientID < 1) return;
+			for (var i:int = 0; i < currentClient.Controllers.length; i++) {
+				if(i >= allCharacters.length || allCharacters[i] == null) continue;
+				allCharacters[i].addToInputBuffer(currentClient.Controllers, i + 1);
+				allCharacters[i].PERFORMALL();
+			}
+			delayedInputs.push(allCharacters[currentClient.ClientID - 1].getInputState(input.getBuffer()));
 			frameTimer++;
-			delayedInputs.push(character.getInputState(input.getBuffer()));
-			if(frameTimer % MAX_INPUT_WAIT != 0) return;
+			if(frameTimer < MAX_INPUT_WAIT) return;
 			currentClient.sendInput(delayedInputs, frameTimer);
 			delayedInputs.length = 0;
+			for (i = 0; i < currentClient.Controllers.length; i++) {
+				currentClient.Controllers[i].shift();
+			}
 			/*character.PERFORMALL();
 			var inputMaximum:int = character.InputBuffer.length < MAX_INPUT_BUFFER ? character.InputBuffer.length : MAX_INPUT_BUFFER;
 			var output:String = "Input Buffer: ";
