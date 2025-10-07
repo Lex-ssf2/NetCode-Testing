@@ -7,6 +7,7 @@ package
         public static const KEY_DOWN:String = "InputEvents::keyDown";
         public static const KEY_UP:String = "InputEvents::keyUp";
         public static const JOINED:String = "InputEvents::joined";
+        public static const OTHER_USER_CONNECTED:String = "InputEvents::otherUserConnected";
 
         public var data:Object;
 

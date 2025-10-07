@@ -7,6 +7,7 @@
 	public class Main extends MovieClip {
 		
 		private const MAX_INPUT_BUFFER:int = 10;
+		private const MAX_INPUT_WAIT:int = 3;
 
 		private var input:InputController;
 		private var character:CharacterController;
@@ -20,6 +21,11 @@
 		private var isHost:Boolean = false;
 		private var hostServer:HostServer;
 		private var currentClient:Client;
+
+		private var frameTimer:int = 0;
+		private var delayedInputs:Array = [];
+
+		public var inputTextFieldVector:Vector.<TextField> = new Vector.<TextField>();
 
 		public function Main() {
 			addChild(hostIP = new TextField());
@@ -77,11 +83,12 @@
 		private function createRoom(e:MouseEvent):void {
 			hostServer = new HostServer();
 			isHost = true;
-			currentClient = new Client("127.0.0.1", 1337);
+			currentClient = new Client("127.0.0.1", 1337, this);
+
 		}
 
 		private function joinRoom(e:MouseEvent):void {
-			currentClient = new Client(hostIP.text, 1337);
+			currentClient = new Client(hostIP.text, 1337, this);
 		}
 
 		private function onJoined(e:*):void {
@@ -105,13 +112,18 @@
 		}
 
 		private function onEnterFrame(e:*):void {
-			character.PERFORMALL();
+			frameTimer++;
+			delayedInputs.push(character.getInputState(input.getBuffer()));
+			if(frameTimer % MAX_INPUT_WAIT != 0) return;
+			currentClient.sendInput(delayedInputs, frameTimer);
+			delayedInputs.length = 0;
+			/*character.PERFORMALL();
 			var inputMaximum:int = character.InputBuffer.length < MAX_INPUT_BUFFER ? character.InputBuffer.length : MAX_INPUT_BUFFER;
 			var output:String = "Input Buffer: ";
 			for (var i:int = 0; i < inputMaximum; i++) {
 				output += character.InputBuffer[i] + (i < inputMaximum - 1 ? ", " : "");
 			}
-			currentInputs.text = output;
+			currentInputs.text = output;*/
 		}
 
 	}

@@ -38,10 +38,9 @@ package {
       addChild(m_mc = new sonic_mc());
     }
 
-    public function getInputState():int {
+    public function getInputState(input:Array):int {
       var state:int = 0;
-      var buffer:Array = input.getBuffer();
-      for each (var keyCode:int in buffer) {
+      for each (var keyCode:int in input) {
         switch (keyCode) {
           case m_UP:
             state |= isPressingUp;
@@ -67,10 +66,10 @@ package {
     }
 
     private function addToInputBuffer():void {
-      m_inputBuffer.unshift(getInputState());
+      /*m_inputBuffer.unshift(getInputState(input.getBuffer()));
       if (m_inputBuffer.length > MAX_INPUT_BUFFER) {
         m_inputBuffer.pop();
-      }
+      }*/
     }
 
     private function movement():void{
