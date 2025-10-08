@@ -1,85 +1,84 @@
-﻿package {
-  import flash.net.ServerSocket;
-  import flash.events.Event;
-  import flash.events.ServerSocketConnectEvent;
-  import flash.events.ProgressEvent;
-  import flash.net.Socket;
+﻿
+package {
+  import flash.events.DatagramSocketDataEvent;
+  import flash.net.DatagramSocket;
+  import flash.utils.ByteArray;
 
   public class HostServer {
-	  
+    private var udpSocket:DatagramSocket;
     private var clients:Array = [];
-    private var serverSocket:ServerSocket;
     private var controllers:Array = [];
     private var controllersBuffer:Array = [];
+    private var frameBuffer:Object = {};
+    private var frameTimer:int = 0;
 
     public function HostServer() {
-      super();
-      try {
-        serverSocket = new ServerSocket();
-        serverSocket.bind(1337);
-        serverSocket.listen();
-        serverSocket.addEventListener(ServerSocketConnectEvent.CONNECT, onClientConnect);
-        trace("Server started on port 1337");
-      } catch (error:Error) {
-        trace("Error starting server: " + error.message);
-      }
+      udpSocket = new DatagramSocket();
+      udpSocket.addEventListener(DatagramSocketDataEvent.DATA, onDataReceived);
+      udpSocket.bind(1337);
+      udpSocket.receive();
+      trace("UDP Server started on port 1337");
     }
 
-    private function onClientConnect(e:ServerSocketConnectEvent):void {
-      trace("Client connected: " + e.socket.remoteAddress + ":" + e.socket.remotePort);
-      clients.push(e.socket);
-      e.socket.writeObject({ type: "clientID", id: clients.length });
-      e.socket.flush();
-      e.socket.addEventListener(ProgressEvent.SOCKET_DATA, onClientData);
-      controllers.push(new Array());
-      controllersBuffer.push(new Array());
-      for each (var client:Socket in clients) {
-        if (client != e.socket) {
-          client.writeObject({ type: "otherUserConnected", id: clients.length });
-          client.flush();
+    private function onDataReceived(e:DatagramSocketDataEvent):void {
+      var msg:String = e.data.readUTFBytes(e.data.bytesAvailable);
+      var data:Object = JSON.parse(msg);
+      var clientIP:String = e.srcAddress;
+      var clientPort:int = e.srcPort;
+
+      var clientIndex:int = getClientIndex(clientIP, clientPort);
+      if (clientIndex == -1) {
+        clients.push({ip: clientIP, port: clientPort});
+        controllers.push([]);
+        controllersBuffer.push([]);
+        clientIndex = clients.length - 1;
+        sendUDP({type: "clientID", id: clients.length}, clientIP, clientPort);
+        for (var i:int = 0; i < clients.length - 1; i++) {
+          sendUDP({type: "otherUserConnected", id: clients.length}, clients[i].ip, clients[i].port);
+        }
+        frameTimer = 0;
+        frameBuffer = new Object();
+      }
+
+      if(data.type == "input") {
+        if(frameBuffer[data.data.frame] == null) {
+          frameBuffer[data.data.frame] = {};
+        }
+        if(frameBuffer[data.data.frame][data.data.id] == undefined) {
+          frameBuffer[data.data.frame][data.data.id] = data.data.input;
         }
       }
-      for each (var array:Array in controllers) {
-       array.length = 0;
-      }
-      for each (var buffer:Array in controllersBuffer) {
-       buffer.length = 0;
-      }
     }
 
-    private function onClientData(e:ProgressEvent):void {
-      var socket:Socket = e.target as Socket;
-      if (socket.bytesAvailable > 0) {
-        var data:Object = socket.readObject();
-        if(data.type == "input") {
-          var clientIndex:int = data.data.id - 1;
-          if (clientIndex != -1) {
-            controllers[clientIndex] = data.data.input;
-            controllersBuffer[clientIndex] = controllers[clientIndex].concat(data.data.input);
+    public function PERFORMALL():void{
+      if(frameBuffer[frameTimer] != null) {
+        var allReceived:Boolean = true;
+        for (var i:int = 1; i <= clients.length; i++) {
+          if(frameBuffer[frameTimer][i] == undefined) {
+            allReceived = false;
+            break;
           }
         }
-      }
-    }
-
-    public function PERFORMALL():void {
-      if(clients.length == 0) return;
-      var allControllersHaveSameLength:Boolean = true;
-      for each(var buffer:Array in controllersBuffer) {
-        if(buffer.length != controllersBuffer[0].length) {
-          allControllersHaveSameLength = false;
-          break;
+        if(allReceived){
+          for (var j:int = 0; j < clients.length; j++) {
+            sendUDP({type: "update", frameData: frameBuffer[frameTimer], frame: frameTimer}, clients[j].ip, clients[j].port);
+          }
+          frameTimer++;
         }
       }
-      if(!allControllersHaveSameLength) return;
-
-      for each (var client:Socket in clients) {
-        client.writeObject({ type: "update", controllers: controllers });
-        client.flush();
-      }
     }
 
-    public function get ServerHost():ServerSocket {
-      return serverSocket;
+    private function sendUDP(obj:Object, ip:String, port:int):void {
+      var bytes:ByteArray = new ByteArray();
+      bytes.writeUTFBytes(JSON.stringify(obj));
+      udpSocket.send(bytes, 0, bytes.length, ip, port);
+    }
+
+    private function getClientIndex(ip:String, port:int):int {
+      for (var i:int = 0; i < clients.length; i++) {
+        if (clients[i].ip == ip && clients[i].port == port) return i;
+      }
+      return -1;
     }
   }
 }

@@ -7,7 +7,7 @@
 	public class Main extends MovieClip {
 		
 		private const MAX_INPUT_BUFFER:int = 10;
-		private const MAX_INPUT_WAIT:int = 3;
+		private const MAX_INPUT_WAIT:int = 1;
 
 		private var input:InputController;
 		private var currentInputs:TextField;
@@ -32,19 +32,22 @@
 			hostIP.width = 200;
 			hostIP.height = 30;
 			hostIP.border = true;
-			hostIP.text = "localhost";
+			hostIP.text = "127.0.0.1";
 			hostIP.x = 10;
 			hostIP.y = 10;
 			hostIP.type = "input";
 			addChild(joinButton = new MovieClip());
 			addChild(createButton = new MovieClip());
 			createButtons();
-			InputEventsManager.dispatcher.addEventListener(InputEvents.JOINED, onJoined);
 			InputEventsManager.dispatcher.addEventListener(InputEvents.OTHER_USER_CONNECTED, onOtherUserConnected);
 			InputEventsManager.dispatcher.addEventListener(InputEvents.HAS_SPAWNED, onHasSpawned);
 		}
 
 		private function onHasSpawned(e:*):void {
+			trace("Joined the server!");
+			removeButtons();
+			input = new InputController(stage);
+			addEventListener("enterFrame", onEnterFrame);
 			trace("A character has spawned!" + currentClient.ClientID);
 			frameTimer = 0;
 			for (var i:int = 0; i < currentClient.ClientID; i++) {
@@ -107,16 +110,6 @@
 			currentClient = new Client(hostIP.text, 1337, this);
 		}
 
-		private function onJoined(e:*):void {
-			trace("Joined the server!");
-			removeButtons();
-			input = new InputController(stage);
-			addEventListener("enterFrame", onEnterFrame);
-			for (var i:int = 0; i < currentClient.ClientID; i++) {
-				spawnCharacter();
-			}
-		}
-
 		private function spawnCharacter():void {
 			var character:CharacterController = new CharacterController(input);
 			addChild(character);
@@ -125,27 +118,26 @@
 
 		private function onEnterFrame(e:*):void {
 			if(isHost) hostServer.PERFORMALL();
-			if(!currentClient.allControllersHaveSameLength() || allCharacters.length < currentClient.ClientID || currentClient.ClientID < 1) return;
+			/*if(!currentClient.allControllersHaveSameLength() || allCharacters.length < currentClient.ClientID || currentClient.ClientID < 1) return;
+*/
+			var currentInputInt:int = -1;
+			if(currentClient.Controllers[currentClient.ClientID - 1] && currentClient.Controllers[currentClient.ClientID - 1].length >= frameTimer - MAX_INPUT_BUFFER) {
+				currentInputInt = currentClient.Controllers[currentClient.ClientID - 1][frameTimer - MAX_INPUT_BUFFER];
+			}
+			if(currentInputInt == -1) {
+				return;
+			}
+			var currentInput:int = allCharacters[currentClient.ClientID - 1].getInputState(input.getBuffer());
+			currentClient.sendInput(currentInput, frameTimer);
 			for (var i:int = 0; i < currentClient.Controllers.length; i++) {
 				if(i >= allCharacters.length || allCharacters[i] == null) continue;
-				allCharacters[i].addToInputBuffer(currentClient.Controllers, i + 1);
+				allCharacters[i].addToInputBuffer(currentClient.Controllers, i + 1, frameTimer - MAX_INPUT_BUFFER);
 				allCharacters[i].PERFORMALL();
 			}
-			delayedInputs.push(allCharacters[currentClient.ClientID - 1].getInputState(input.getBuffer()));
 			frameTimer++;
-			if(frameTimer < MAX_INPUT_WAIT) return;
-			currentClient.sendInput(delayedInputs, frameTimer);
-			delayedInputs.length = 0;
-			for (i = 0; i < currentClient.Controllers.length; i++) {
+			/*for (i = 0; i < currentClient.Controllers.length; i++) {
 				currentClient.Controllers[i].shift();
-			}
-			/*character.PERFORMALL();
-			var inputMaximum:int = character.InputBuffer.length < MAX_INPUT_BUFFER ? character.InputBuffer.length : MAX_INPUT_BUFFER;
-			var output:String = "Input Buffer: ";
-			for (var i:int = 0; i < inputMaximum; i++) {
-				output += character.InputBuffer[i] + (i < inputMaximum - 1 ? ", " : "");
-			}
-			currentInputs.text = output;*/
+			}*/
 		}
 
 	}

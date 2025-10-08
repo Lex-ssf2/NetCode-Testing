@@ -1,13 +1,19 @@
-package {
 
-  import flash.errors.*;
-  import flash.events.*;
-  import flash.net.Socket;
+package {
+  import flash.events.DatagramSocketDataEvent;
+  import flash.net.DatagramSocket;
+  import flash.utils.ByteArray;
   import flash.display.MovieClip;
   import flash.text.TextField;
+  import flash.events.Event;
 
-  public class Client extends Socket {
+  public class Client {
 
+    private const MAX_RESEND:int = 5;
+
+    private var udpSocket:DatagramSocket;
+    private var serverIP:String;
+    private var serverPort:int;
     private var currentInput:InputController;
     private var clientID:int = -1;
     private var stageRef:MovieClip;
@@ -15,30 +21,31 @@ package {
     private var canSendAgain:Boolean = true;
 
     public function Client(ip:String, port:int, stageRef:MovieClip) {
-      super();
+      this.serverIP = ip;
+      this.serverPort = port;
       this.stageRef = stageRef;
-      configureListeners();
-      connect(ip, port);
+      udpSocket = new DatagramSocket();
+      udpSocket.addEventListener(DatagramSocketDataEvent.DATA, onDataReceived);
+      udpSocket.bind();
+      udpSocket.receive();
+      sendRequest();
     }
 
-    private function configureListeners():void {
-      addEventListener(Event.CLOSE, closeHandler);
-      addEventListener(Event.CONNECT, connectHandler);
-      addEventListener(IOErrorEvent.IO_ERROR, ioErrorHandler);
-      addEventListener(SecurityErrorEvent.SECURITY_ERROR, securityErrorHandler);
-      addEventListener(ProgressEvent.SOCKET_DATA, socketDataHandler);
-    }
-
-      
     private function sendRequest():void {
-      trace("sendRequest");
+      trace("sendRequest UDP");
       var request:Object = {type: "join"};
-      writeObject(request);
-      flush();
+      sendUDP(request);
     }
 
-    private function readResponse():void {
-      var response:Object = readObject();
+    private function sendUDP(obj:Object):void {
+      var bytes:ByteArray = new ByteArray();
+      bytes.writeUTFBytes(JSON.stringify(obj));
+      udpSocket.send(bytes, 0, bytes.length, serverIP, serverPort);
+    }
+
+    private function onDataReceived(e:DatagramSocketDataEvent):void {
+      var msg:String = e.data.readUTFBytes(e.data.bytesAvailable);
+      var response:Object = JSON.parse(msg);
       if (response.type == "clientID") {
         trace("Assigned Client ID: " + response.id);
         clientID = response.id;
@@ -71,54 +78,25 @@ package {
         InputEventsManager.dispatcher.dispatchEvent(new Event(InputEvents.OTHER_USER_CONNECTED));
         canSendAgain = true;
       }else if(response.type == "update") {
-        var controllers:Array = response.controllers;
-        canSendAgain = true;
-        trace("Received update for controllers: " + controllers);
-        for(i = 0; i < controllers.length; i++) {
-          actualControllers[i] = actualControllers[i].concat(controllers[i]);
-          var inputStr:String = "User " + (i + 1) + " Inputs: ";
-          for each(var inputCode:int in actualControllers[i]) {
-            inputStr += inputCode + " ";
+        for(var j:int = 0; j < actualControllers.length; j++) {
+          while(actualControllers[j].length <= response.frame) {
+            actualControllers[j].push(-1);
           }
-          stageRef.inputTextFieldVector[i].text = inputStr;
+          if(actualControllers[j][response.frame] == -1 && response.frameData[j + 1] != undefined) {
+            actualControllers[j][response.frame] = response.frameData[j + 1];
+          }
         }
-        var responseServer:Object = {type: "accepted", data: {id: clientID}};
-        writeObject(responseServer);
-        flush();
       }
     }
 
-    private function closeHandler(event:Event):void {
-      trace("closeHandler: " + event);
-    }
-
-    private function connectHandler(event:Event):void {
-      trace("connectHandler: " + event);
-      InputEventsManager.dispatcher.dispatchEvent(new Event(InputEvents.JOINED));
-      sendRequest();
-    }
-
-    private function ioErrorHandler(event:IOErrorEvent):void {
-      trace("ioErrorHandler: " + event);
-    }
-
-    private function securityErrorHandler(event:SecurityErrorEvent):void {
-      trace("securityErrorHandler: " + event);
-    }
-
-    private function socketDataHandler(event:ProgressEvent):void {
-      //trace("socketDataHandler: " + event);
-      readResponse();
-    }
-
-    public function sendInput(input:Array, currentFrame:int):void {
-      var allControllersHaveSameLength:Boolean = allControllersHaveSameLength();
+    public function sendInput(input:int, currentFrame:int):void {
+      /*var allControllersHaveSameLength:Boolean = allControllersHaveSameLength();
       if(!allControllersHaveSameLength) trace("Waiting for all controllers to sync...");
-      if(clientID == -1 || !allControllersHaveSameLength || !canSendAgain) return; // Not yet assigned an ID
+      if(clientID == -1 || !allControllersHaveSameLength || !canSendAgain) return;*/
       var response:Object = {type: "input", data: {input: input, id: clientID, frame: currentFrame}};
-      writeObject(response);
-      flush();
-      canSendAgain = false;
+      for (var i:int = 0; i < MAX_RESEND; i++) {
+        sendUDP(response);
+      }
     }
 
     public function get Controllers():Array {

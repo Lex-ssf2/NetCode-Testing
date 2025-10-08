@@ -65,9 +65,9 @@ package {
       return state;
     }
 
-    public function addToInputBuffer(buffer:Array, currentClient:int):void {
-      if (currentClient < 0 || !buffer || !buffer[currentClient - 1] || buffer.length <= 0 || buffer[currentClient - 1].length <= 0) return;
-      m_inputBuffer.unshift(buffer[currentClient - 1][0]);
+    public function addToInputBuffer(buffer:Array, currentClient:int, frame:int):void {
+      if (currentClient < 0 || !buffer || !buffer[currentClient - 1] || frame < 0 || buffer.length <= 0 || buffer[currentClient - 1].length <= 0) return;
+      m_inputBuffer.unshift(buffer[currentClient - 1][frame]);
     }
 
     private function movement():void{
