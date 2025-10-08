@@ -5,12 +5,16 @@ package {
   import flash.utils.ByteArray;
 
   public class HostServer {
+
+    private const MAX_WAITING_TIME:int = 30;
+
     private var udpSocket:DatagramSocket;
     private var clients:Array = [];
     private var controllers:Array = [];
     private var controllersBuffer:Array = [];
     private var frameBuffer:Object = {};
     private var frameTimer:int = 0;
+    private var askTimer:int = 0;
 
     public function HostServer() {
       udpSocket = new DatagramSocket();
@@ -48,14 +52,24 @@ package {
           frameBuffer[data.data.frame][data.data.id] = data.data.input;
         }
       }
+      if(data.type == "askFrame") {
+        if(frameBuffer[data.frame] != null && frameBuffer[data.frame][data.id] != undefined) {
+          sendUDP({type: "update", frameData: frameBuffer[data.frame], frame: data.frame}, clientIP, clientPort);
+        }
+      }
     }
 
     public function PERFORMALL():void{
       if(frameBuffer[frameTimer] != null) {
         var allReceived:Boolean = true;
         for (var i:int = 1; i <= clients.length; i++) {
+          // If someone hasn't sent their frame data yet
           if(frameBuffer[frameTimer][i] == undefined) {
             allReceived = false;
+            askTimer++;
+            if(askTimer > MAX_WAITING_TIME) { // Ask every MAX_WAITING_TIME frames if not received
+              sendUDP({type: "askFrameServer", frame: frameTimer, id: i}, clients[i - 1].ip, clients[i - 1].port);
+            }
             break;
           }
         }
@@ -64,6 +78,15 @@ package {
             sendUDP({type: "update", frameData: frameBuffer[frameTimer], frame: frameTimer}, clients[j].ip, clients[j].port);
           }
           frameTimer++;
+          askTimer = 0;
+        }
+      }else{
+        // If NOBODY has sent their frame data yet
+        askTimer++;
+        for (var i:int = 1; i <= clients.length; i++) {
+          if(askTimer > MAX_WAITING_TIME) { // Ask every MAX_WAITING_TIME frames if not received
+            sendUDP({type: "askFrameServer", frame: frameTimer, id: i}, clients[i - 1].ip, clients[i - 1].port);
+          }
         }
       }
     }

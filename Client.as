@@ -6,6 +6,7 @@ package {
   import flash.display.MovieClip;
   import flash.text.TextField;
   import flash.events.Event;
+  import flash.utils.setTimeout;
 
   public class Client {
 
@@ -19,6 +20,7 @@ package {
     private var stageRef:MovieClip;
     private var actualControllers:Array = new Array();
     private var canSendAgain:Boolean = true;
+    private var m_localInputs:Array = [];
 
     public function Client(ip:String, port:int, stageRef:MovieClip) {
       this.serverIP = ip;
@@ -78,6 +80,11 @@ package {
         InputEventsManager.dispatcher.dispatchEvent(new Event(InputEvents.OTHER_USER_CONNECTED));
         canSendAgain = true;
       }else if(response.type == "update") {
+        // debug
+        /*if(Math.random() < 0.01) {
+          trace("Simulated packet loss for frame " + response.frame);
+          return;
+        }*/
         for(var j:int = 0; j < actualControllers.length; j++) {
           while(actualControllers[j].length <= response.frame) {
             actualControllers[j].push(-1);
@@ -86,6 +93,23 @@ package {
             actualControllers[j][response.frame] = response.frameData[j + 1];
           }
         }
+      }else if(response.type == "askFrameServer") {
+        trace("Server is asking for frame " + response.frame + " data");
+        resendFrameData(response.frame);
+      }
+    }
+
+    public function askFrame(frame:int):void {
+      var request:Object = {type: "askFrame", frame: frame, id: clientID};
+      sendUDP(request);
+    }
+
+    private function resendFrameData(frame:int):void {
+      if(frame < m_localInputs.length && m_localInputs[frame] != -1) {
+        var response:Object = {type: "input", data: {input: m_localInputs[frame], id: clientID, frame: frame}};
+        for (var i:int = 0; i < MAX_RESEND; i++) {
+          sendUDP(response);
+        }
       }
     }
 
@@ -93,10 +117,21 @@ package {
       /*var allControllersHaveSameLength:Boolean = allControllersHaveSameLength();
       if(!allControllersHaveSameLength) trace("Waiting for all controllers to sync...");
       if(clientID == -1 || !allControllersHaveSameLength || !canSendAgain) return;*/
-      var response:Object = {type: "input", data: {input: input, id: clientID, frame: currentFrame}};
-      for (var i:int = 0; i < MAX_RESEND; i++) {
-        sendUDP(response);
+      while(m_localInputs.length - 1 < currentFrame) {
+        m_localInputs.push(-1);
       }
+      m_localInputs[currentFrame] = input;
+      // debug
+      /*if(Math.random() < 0.01) {
+        trace("Didn't send frame " + currentFrame);
+        return;
+      }*/
+      setTimeout(function() {
+        var response:Object = {type: "input", data: {input: input, id: clientID, frame: currentFrame}};
+        for (var i:int = 0; i < MAX_RESEND; i++) {
+          sendUDP(response);
+        }
+      }, 300);
     }
 
     public function get Controllers():Array {

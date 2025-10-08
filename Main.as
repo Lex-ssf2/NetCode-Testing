@@ -6,8 +6,8 @@
 	
 	public class Main extends MovieClip {
 		
-		private const MAX_INPUT_BUFFER:int = 10;
 		private const MAX_INPUT_WAIT:int = 1;
+		private const MAX_MISSING_PACKETS_WAIT:int = 30;
 
 		private var input:InputController;
 		private var currentInputs:TextField;
@@ -26,6 +26,11 @@
 		public var inputTextFieldVector:Vector.<TextField> = new Vector.<TextField>();
 
 		public var allCharacters:Vector.<CharacterController> = new Vector.<CharacterController>();
+
+		private var frameTimerText:TextField;
+
+		private var missingPacketCounter:int = 0;
+		private var m_myInputs:Array = [];
 
 		public function Main() {
 			addChild(hostIP = new TextField());
@@ -53,6 +58,13 @@
 			for (var i:int = 0; i < currentClient.ClientID; i++) {
 				spawnCharacter();
 			}
+			frameTimerText = new TextField();
+			frameTimerText.width = 200;
+			frameTimerText.height = 30;
+			frameTimerText.border = true;
+			frameTimerText.x = 200;
+			frameTimerText.y = 50;
+			addChild(frameTimerText);
 		}
 
 		private function onOtherUserConnected(e:*):void {
@@ -121,20 +133,30 @@
 			/*if(!currentClient.allControllersHaveSameLength() || allCharacters.length < currentClient.ClientID || currentClient.ClientID < 1) return;
 */
 			var currentInputInt:int = -1;
-			if(currentClient.Controllers[currentClient.ClientID - 1] && currentClient.Controllers[currentClient.ClientID - 1].length >= frameTimer - MAX_INPUT_BUFFER) {
-				currentInputInt = currentClient.Controllers[currentClient.ClientID - 1][frameTimer - MAX_INPUT_BUFFER];
+			if(currentClient.Controllers[currentClient.ClientID - 1] && currentClient.Controllers[currentClient.ClientID - 1].length > frameTimer - MAX_INPUT_WAIT) {
+				currentInputInt = currentClient.Controllers[currentClient.ClientID - 1][frameTimer - MAX_INPUT_WAIT];
 			}
 			if(currentInputInt == -1) {
+				/*trace("Missing input for frame " + (frameTimer - MAX_INPUT_WAIT) + ", waiting up to " + MAX_INPUT_WAIT + " frames...");
+				trace("Current input buffer length: " + (currentClient.Controllers[currentClient.ClientID - 1] ? currentClient.Controllers[currentClient.ClientID - 1].length : 0) + ", required: " + (frameTimer - MAX_INPUT_WAIT));
+				trace("Waiting for all controllers to sync...");*/
+				missingPacketCounter++;
+				if(missingPacketCounter > MAX_MISSING_PACKETS_WAIT) {
+					//trace("Missing the frame asking for it again");
+					currentClient.askFrame(frameTimer - MAX_INPUT_WAIT);
+				}
 				return;
 			}
+			missingPacketCounter = 0;
 			var currentInput:int = allCharacters[currentClient.ClientID - 1].getInputState(input.getBuffer());
 			currentClient.sendInput(currentInput, frameTimer);
 			for (var i:int = 0; i < currentClient.Controllers.length; i++) {
 				if(i >= allCharacters.length || allCharacters[i] == null) continue;
-				allCharacters[i].addToInputBuffer(currentClient.Controllers, i + 1, frameTimer - MAX_INPUT_BUFFER);
+				allCharacters[i].addToInputBuffer(currentClient.Controllers, i + 1, frameTimer - MAX_INPUT_WAIT);
 				allCharacters[i].PERFORMALL();
 			}
 			frameTimer++;
+			frameTimerText.text = "Frame: " + frameTimer;
 			/*for (i = 0; i < currentClient.Controllers.length; i++) {
 				currentClient.Controllers[i].shift();
 			}*/
