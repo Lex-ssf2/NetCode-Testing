@@ -126,12 +126,12 @@ package {
         trace("Didn't send frame " + currentFrame);
         return;
       }*/
-      setTimeout(function() {
+      //setTimeout(function() {
         var response:Object = {type: "input", data: {input: input, id: clientID, frame: currentFrame}};
         for (var i:int = 0; i < MAX_RESEND; i++) {
           sendUDP(response);
         }
-      }, 300);
+      //}, 300);
     }
 
     public function get Controllers():Array {

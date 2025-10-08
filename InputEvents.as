@@ -9,6 +9,8 @@ package
         public static const JOINED:String = "InputEvents::joined";
         public static const OTHER_USER_CONNECTED:String = "InputEvents::otherUserConnected";
         public static const HAS_SPAWNED:String = "InputEvents::hasSpawned";
+        public static const HAS_PRESSED_A:String = "InputEvents::hasPressedA";
+        public static const HAS_PRESSED_B:String = "InputEvents::hasPressedB";
 
         public var data:Object;
 

@@ -27,6 +27,8 @@ package {
     private var m_inputBuffer:Vector.<int> = new Vector.<int>();
     private var m_mc:sonic_mc;
 
+    private var frame:int = 0;
+
     public function CharacterController(input:InputController, data:Object = null) {
       this.input = input;
       m_UP = (data && data.UP) ? data.UP : 87;
@@ -68,6 +70,9 @@ package {
     public function addToInputBuffer(buffer:Array, currentClient:int, frame:int):void {
       if (currentClient < 0 || !buffer || !buffer[currentClient - 1] || frame < 0 || buffer.length <= 0 || buffer[currentClient - 1].length <= 0) return;
       m_inputBuffer.unshift(buffer[currentClient - 1][frame]);
+      if(buffer[currentClient - 1][frame] & isPressingA) {
+        InputEventsManager.dispatcher.dispatchEvent(new InputEvents(InputEvents.HAS_PRESSED_A, {id: currentClient, frame: frame}));
+      }
     }
 
     private function movement():void{
@@ -88,7 +93,6 @@ package {
       if (m_inputBuffer[INPUT_DELAY] & isPressingDown) {
         m_mc.y += 5;
       }
-
     }
 
     public function PERFORMALL():void {

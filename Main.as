@@ -6,8 +6,9 @@
 	
 	public class Main extends MovieClip {
 		
-		private const MAX_INPUT_WAIT:int = 1;
+		private const MAX_INPUT_WAIT:int = 4;
 		private const MAX_MISSING_PACKETS_WAIT:int = 30;
+		private const COYOTE_TIME:int = 10;
 
 		private var input:InputController;
 		private var currentInputs:TextField;
@@ -32,6 +33,9 @@
 		private var missingPacketCounter:int = 0;
 		private var m_myInputs:Array = [];
 
+		private var pressedAChars:Array = [];
+		private var frameTimerTextArray:Array = [];
+
 		public function Main() {
 			addChild(hostIP = new TextField());
 			hostIP.width = 200;
@@ -46,6 +50,13 @@
 			createButtons();
 			InputEventsManager.dispatcher.addEventListener(InputEvents.OTHER_USER_CONNECTED, onOtherUserConnected);
 			InputEventsManager.dispatcher.addEventListener(InputEvents.HAS_SPAWNED, onHasSpawned);
+			InputEventsManager.dispatcher.addEventListener(InputEvents.HAS_PRESSED_A, onHasPressedA);
+		}
+
+		private function onHasPressedA(e:*):void {
+			var charID:int = e.data.id - 1;
+			if(charID < 0 || charID >= allCharacters.length) return;
+			pressedAChars[charID] = e.data.frame;
 		}
 
 		private function onHasSpawned(e:*):void {
@@ -64,6 +75,7 @@
 			frameTimerText.border = true;
 			frameTimerText.x = 200;
 			frameTimerText.y = 50;
+			frameTimerTextArray.push(frameTimerText);
 			addChild(frameTimerText);
 		}
 
@@ -126,6 +138,7 @@
 			var character:CharacterController = new CharacterController(input);
 			addChild(character);
 			allCharacters.push(character);
+			pressedAChars.push(-1);
 		}
 
 		private function onEnterFrame(e:*):void {
@@ -146,6 +159,13 @@
 					currentClient.askFrame(frameTimer - MAX_INPUT_WAIT);
 				}
 				return;
+			}
+			if((frameTimer - MAX_INPUT_WAIT) % 100 < COYOTE_TIME || (frameTimer - MAX_INPUT_WAIT) % 100 > 100 - COYOTE_TIME) {
+				for (var i:int = 0; i < allCharacters.length; i++) {
+					if(Math.abs(frameTimer - MAX_INPUT_WAIT - pressedAChars[i]) < MAX_INPUT_WAIT + COYOTE_TIME) {
+						trace(i + " pressed at " + pressedAChars[i] + " current frame: " + (frameTimer - MAX_INPUT_WAIT));
+					}
+				}
 			}
 			missingPacketCounter = 0;
 			var currentInput:int = allCharacters[currentClient.ClientID - 1].getInputState(input.getBuffer());
